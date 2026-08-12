@@ -2,7 +2,7 @@ Code was made for zeptoforth on RP2040/RP2350 boards to expose internal flash me
 
 
 Usage:
-Upload main.fs with codeload3
+Upload main.fs with codeload3 via serial port on zeptoforth without usb console.
 
 run `prepare` if no FS initialized in block device
 
