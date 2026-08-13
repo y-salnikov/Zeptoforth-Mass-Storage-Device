@@ -1018,7 +1018,15 @@ variable lba-count
 		1000 ms
 	again
   ;
+	
+  : u@  ( adr -- x ) \ unaligned read for RP2040
+	dup c@ swap dup 1+ c@ 8 lshift swap dup 2 + c@ 16 lshift swap 3 + c@ 24 lshift 
+	or or or
+  ;
 
+  : uh! ( x adr -- ) \ unaligned 16-bit write
+	over $ff and over c! swap $ff00 and 8 rshift swap 1+  c! 
+  ;
 
   : reverse-byte-order ( u_in -- u_out )
 		dup $000000FF and 24 lshift  >R
@@ -1031,9 +1039,9 @@ variable lba-count
   :	SCSI-prepare-format-capacity-data
 	SCSI-format-capacity-data 12 0 fill
 	8 SCSI-format-capacity-data 3 + c!									\ list_length
-	blks block-count reverse-byte-order	SCSI-format-capacity-data 4 + ! \ block_num
+	blks block-count reverse-byte-order	SCSI-format-capacity-data 4 + ! \ block_num    should be aligned
 	2 SCSI-format-capacity-data 8 + c!									\ 2 - formated media
-	blks block-size dup $ff and 8 lshift swap $ff00 and 8 rshift or SCSI-format-capacity-data 10 + h!
+	blks block-size dup $ff and 8 lshift swap $ff00 and 8 rshift or SCSI-format-capacity-data 10 + uh!
   ;
 
   : SCSI-response ( -- )
@@ -1092,13 +1100,13 @@ variable lba-count
 
 		adr c@ case
 			$12 of									\ INQUIRY
-	\			CBW-COPY dCBWDataTransferLength @ 36 = if
+\				CBW-COPY dCBWDataTransferLength @ 36 = if
 					SCSI-inquiry-response-data EP4-to-Host dpram-address @ 36 move
 					$12 RESPONSE-CMD !
 					EP4-to-Host 36 usb-send-data-packet
-	\			else
-	\				." dCBWDataTransferLength != 36" cr
-	\			then
+\				else
+\					." dCBWDataTransferLength != 36" cr
+\				then
 			endof
 
 			$00 of									\ Test unit ready
@@ -1115,7 +1123,7 @@ variable lba-count
 			endof
 			
 			$28 of									\ Read(10)
-				CBW-COPY dCBWCB	 2 + @ reverse-byte-order 
+				CBW-COPY dCBWCB	 2 + u@ reverse-byte-order                  \ Unaligned memory read !!! 
 				CBW-COPY dCBWCB  7 + dup c@ swap 1+ c@ swap 8 lshift or 
 				( lba num -- )
 				$28 RESPONSE-CMD !
@@ -1145,7 +1153,7 @@ variable lba-count
 \				decimal
 
 
-				CBW-COPY dCBWCB	 2 + @ reverse-byte-order 
+				CBW-COPY dCBWCB	 2 + u@ reverse-byte-order 
 				CBW-COPY dCBWCB  7 + dup c@ swap 1+ c@ swap 8 lshift or 
 				( lba num -- )
 				$2A RESPONSE-CMD !

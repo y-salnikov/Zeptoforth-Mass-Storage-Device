@@ -49,7 +49,7 @@ end-module> import
 \ THE rp2350_16mib PLATFORM (E.G. WITH THE PIMORONI PICO PLUS 2)
 \ prepare
 
-compile-to-flash
+\ compile-to-flash
 
 \ Compile code to set up blocks FAT32 on boot
 \ defined? setup-blocks-fat32 not [if]
@@ -75,7 +75,19 @@ compile-to-flash
     
   end-module> import
 
-  initializer setup
+\  initializer setup
+\
 \ [then]
+compile-to-ram
 
- reboot
+led import
+: prepare-and-reboot
+  1 green led!
+	." ok" cr
+	 prepare
+	\ reboot
+  0 green led!
+;
+   \ wait until led turns off 
+   prepare-and-reboot
+   setup
