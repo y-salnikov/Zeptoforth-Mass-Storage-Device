@@ -19,7 +19,23 @@
 \ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 \ SOFTWARE.
 
-\ compile-to-flash
+0
+defined? usb-console? not [if]
+	." 'usb-console?' constant must be defined" cr
+	1+
+[then]
+defined? usb-msc-blocks not [if]
+	." 'usb-msc-blocks' constant must be defined" cr
+	1+
+[then]
+
+0> [if]
+	constants-not-defined
+[then]
+
+#include usb_constants.fs   
+#include usb_cdc_buffers.fs 
+#include usb_core_and_cdc.fs
 
 continue-module usb
 
@@ -153,6 +169,7 @@ continue-module usb
     ;
 
     \ Initialize USB console
+
     : init-usb-console ( -- )
       
       init-usb
@@ -164,13 +181,14 @@ continue-module usb
 
       usb-insert-device
 
- \     switch-to-usb-console
+      usb-console? if switch-to-usb-console then
     ;
 
 \    initializer init-usb-console
 
-	: usb-msc-set-block-device ( blk-object -- )
-		to blks
+	: init-usb
+		usb-msc-blocks to blks
+		init-usb-console
 	;
 
   end-module> import
@@ -192,10 +210,9 @@ continue-module usb
   : with-usb-error-output ( xt -- )
     ['] usb-emit ['] usb-emit? rot ['] usb-flush-console swap with-error-output
   ;
-  ' init-usb-console export init-usb-console
-  ' usb-msc-set-block-device export usb-msc-set-block-device
-
+  ' init-usb export init-usb
+  
+  initializer init-usb
+  
 
 end-module
-
-compile-to-ram

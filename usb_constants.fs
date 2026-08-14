@@ -20,8 +20,6 @@
 \ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 \ SOFTWARE.
 
-\  compile-to-flash
-
 begin-module usb-constants
 
 rp2040? [if]
@@ -262,6 +260,3 @@ USB_DPRAM_Base $68  + constant EP0_STALL_ARM
 USB_DPRAM_Base $100 + constant EP0_DPRAM_SHARED
 
 end-module
-
-compile-to-ram
-

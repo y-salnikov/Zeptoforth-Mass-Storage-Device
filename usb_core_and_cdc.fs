@@ -20,8 +20,6 @@
 \ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 \ SOFTWARE.
 
- compile-to-flash
-
 begin-module usb
   
   \ Are USB console special characters enabled?
@@ -996,7 +994,8 @@ variable lba-count
     \ N.B. no corresponding EP3-to-Pico endpoint required
   ;
 
-  led import
+\  LED pin 25 used in pico-w
+\  led import
   : flush-task
 	0 { st }
 	begin
@@ -1006,13 +1005,13 @@ variable lba-count
 				PREVENT-REMOVAL @ 0= if
 					blks flush-blocks
 					0 to st
-					0 green led!
+\					0 green led!
 				then
 			then
 		else
 			PREVENT-REMOVAL @ if
 				1 to st
-				1 green led!
+\				1 green led!
 			then
 		then
 		1000 ms
@@ -1380,5 +1379,3 @@ variable lba-count
   ;
 
 end-module
-
-compile-to-ram
