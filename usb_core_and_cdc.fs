@@ -220,6 +220,17 @@ begin-module usb-core
 	0 c, 
 	\ 4 bytes total ( from tinyusb/src/class/msc/msc.h )
 
+  create SCSI-request-sense-data
+	$70 c,				\ error
+	$00 c,
+	$02 c,				\ not ready
+	0 c, 0 c, 0 c, 0 c,
+	$0a c,				\ 10 additional bytes
+	0 c, 0 c, 0 c, 0 c,
+	$3a c, $00 c,				\ medium not present
+	0 c, 
+	0 c, 0 c, 0 c, 
+	\ 18 bytes total
 
   \ Read Format Capacity Response data
 	12 buffer: SCSI-format-capacity-data 
@@ -1047,13 +1058,27 @@ variable lba-count
 				RESPONSE-CMD @ 0 >= if
 					CBW-COPY dCBWTag CSW dCBWTag 4 move
 					0 CSW dCSWDataResidue !
-					0 CSW bCSWStatus c!
+					0 { r-val }
+					blks 0= if 1 to r-val else 0 to r-val then
+					RESPONSE-CMD @ case
+						$00 of
+								r-val CSW bCSWStatus c!
+						endof
+						$25 of
+								r-val CSW bCSWStatus c!
+						endof
+						$28 of
+								r-val CSW bCSWStatus c!
+						endof
+						$2a of
+								r-val CSW bCSWStatus c!
+						endof
+						$23 of
+								r-val CSW bCSWStatus c!
+						endof
 
-\					16 base !
-\					s" SCSI Response on " type RESPONSE-CMD @ . s" :" type
-\					13 0 do CSW i + c@ . loop cr   \ debug
-\					decimal flush-console
-				
+						0 CSW bCSWStatus c!
+					endcase
 					CSW EP4-to-Host dpram-address @ 13 move
 					-1 RESPONSE-CMD !
 					EP4-to-Host 13 usb-send-data-packet
@@ -1168,6 +1193,12 @@ variable lba-count
 				SCSI-format-capacity-data EP4-to-Host dpram-address @ 12 move
 				$23 RESPONSE-CMD !
 				EP4-to-Host 12 usb-send-data-packet
+			endof
+
+			$03 of								\ request sense
+				SCSI-request-sense-data EP4-to-Host dpram-address @ 18 move
+				$03 RESPONSE-CMD !
+				EP4-to-Host 18 usb-send-data-packet
 			endof
 
 			s" SCSI Cmd: " type

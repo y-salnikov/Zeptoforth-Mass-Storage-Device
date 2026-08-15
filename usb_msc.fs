@@ -24,13 +24,9 @@ defined? usb-console? not [if]
 	." 'usb-console?' constant must be defined" cr
 	1+
 [then]
-defined? usb-msc-blocks not [if]
-	." 'usb-msc-blocks' constant must be defined" cr
-	1+
-[then]
 
 0> [if]
-	constants-not-defined
+	constant-not-defined
 [then]
 
 #include usb_constants.fs   
@@ -187,9 +183,14 @@ continue-module usb
 \    initializer init-usb-console
 
 	: init-usb
-		usb-msc-blocks to blks
+		[ defined? usb-msc-blocks  [if] usb-msc-blocks [else] 0 [then] ] literal 
+		to blks
 		init-usb-console
 	;
+
+    : set-usb-blocks ( blocks-object -- )
+		to blks
+    ;
 
   end-module> import
 
@@ -210,8 +211,11 @@ continue-module usb
   : with-usb-error-output ( xt -- )
     ['] usb-emit ['] usb-emit? rot ['] usb-flush-console swap with-error-output
   ;
+
+
   ' init-usb export init-usb
-  
+  ' set-usb-blocks export set-usb-blocks
+
   initializer init-usb
   
 
