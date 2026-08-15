@@ -2,10 +2,14 @@ Code was made for zeptoforth on RP2040/RP2350 boards to expose internal flash me
 
 
 Usage:
-Upload usb_msc.fs with codeload3 via serial port on zeptoforth without usb console.
-You must define constant usb-console? before uploading, if true - switch to usb console after loading. Even with usb-console set to false you can use words like with-usb-output or with-usb-input.
-There is optional constant usb-msc-blocks - address of blocks class object, described in block-dev module, can be internal flash, PS-RAM or SD-card (not tested).
-If usb-msc-blocks absent or equal to zero - USB-device will be in not ready state. You may specify blocks object later with usb::set-usb-blocks. Blocks device can be changet at any time.
+Upload `usb_msc.fs` with codeload3 via serial port on zeptoforth without usb console.
+
+You must define constant `usb-console?` before uploading, if true - switch to usb console after loading. Even with `usb-console?` set to false you can use words like `with-usb-output` or `with-usb-input`.
+
+There is optional constant `usb-msc-blocks` - address of blocks class object, described in `block-dev` module, can be internal flash, PS-RAM or SD-card (not tested).
+
+If `usb-msc-blocks` absent or equal to zero then USB-device will be in not ready state. You may specify blocks object later with `usb::set-usb-blocks`.
+Blocks device can be changet at any time.
 
 
 example of loading script:
@@ -35,11 +39,5 @@ false constant usb-console?     \ true to switch console to USB
 \ reboot \ needed after compilation to flash
 
 ```
-
-
-
-You can format "flash drive" in linux or windows but fat32-tools can't work with it.
-Device can be mounted in linux with:
-`sudo mount -t vfat -o uid=<user> /dev/sd<x>1 <mount point>`
 
 
