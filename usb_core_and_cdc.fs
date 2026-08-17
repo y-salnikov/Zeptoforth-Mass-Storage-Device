@@ -1203,6 +1203,12 @@ variable lba-count
 				$03 RESPONSE-CMD !
 				EP4-to-Host 18 usb-send-data-packet
 			endof
+			$35 of								\ SYNCHRONIZE CACHE
+				blks flush-blocks
+				$35 RESPONSE-CMD !
+				SCSI-response 
+			endof
+
 
 			s" SCSI Cmd: " type
 			16 base !
