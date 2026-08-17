@@ -1063,7 +1063,10 @@ variable lba-count
 					RESPONSE-CMD @ case
 						$00 of
 								r-val CSW bCSWStatus c!
-						endof
+                                                endof
+                                                $1B of
+                                                  r-val CSW bCSWStatus c!
+                                                endof
 						$25 of
 								r-val CSW bCSWStatus c!
 						endof
@@ -1163,7 +1166,11 @@ variable lba-count
 				$1A RESPONSE-CMD !
 				EP4-to-Host 4 usb-send-data-packet
 			endof
-
+                        $1B of
+                          \ handle STOP START UNIT
+                          $1B RESPONSE-CMD !
+                          SCSI-response
+                        endof
 			$1E of									\ prevent/allow media removal
 				CBW-COPY dCBWCB 4 + c@ PREVENT-REMOVAL !
 				$1E RESPONSE-CMD !
