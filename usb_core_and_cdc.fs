@@ -29,7 +29,7 @@ end-module> import
 
 begin-module usb-core
 
-  rp2040? [if] armv6m import [then]
+  armv6m import
   interrupt import
   usb-constants import
   usb-cdc-buffers import
@@ -1039,11 +1039,7 @@ variable lba-count
   ;
 
   : reverse-byte-order ( u_in -- u_out )
-		dup $000000FF and 24 lshift  >R
-		dup $0000FF00 and 8 lshift   >R
-		dup $00FF0000 and 8 rshift   >R
-			$FF000000 and 24 rshift 
-		R> or R> or R> or 
+    [inlined] code[ r6 r6 rev_,_ ]code
   ;
 
   :	SCSI-prepare-format-capacity-data
