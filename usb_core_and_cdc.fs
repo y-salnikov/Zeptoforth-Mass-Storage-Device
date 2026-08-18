@@ -1267,8 +1267,29 @@ variable lba-count
 			endcase
 			EP4-to-Pico 64 usb-receive-data-packet
 	;
+	
+	variable EP4-mailbox
+	variable EP4-task
 
-
+	: EP4-handler
+		begin
+			0 wait-notify case
+				0 of				\ EP4-to-Host interrupt
+					ep4-handler-to-host
+				endof				\ EP4-to-Pico interrupt
+				1 of
+					ep4-handler-to-pico
+				endof
+			endcase
+		again
+	;
+	
+	: EP4-task-init
+		0 EP4-mailbox !
+		0 ['] EP4-handler 1024 256 512 spawn EP4-task !
+		EP4-mailbox 1 EP4-task @ config-notify
+		EP4-task @ run
+	;
 
 	\ USB buffer completion handler distribution - Control EP0 to/from Host
 	: usb-buffer-status-control-endpoints ( -- )
@@ -1289,8 +1310,8 @@ variable lba-count
     buffer-status USB_BUFFER_STATUS_EP1_TO_HOST and if ep1-handler-to-host then
     buffer-status USB_BUFFER_STATUS_EP1_TO_PICO and if ep1-handler-to-pico then
     buffer-status USB_BUFFER_STATUS_EP3_TO_HOST and if ep3-handler-to-host then
-    buffer-status USB_BUFFER_STATUS_EP4_TO_HOST and if ep4-handler-to-host then
-    buffer-status USB_BUFFER_STATUS_EP4_TO_PICO and if ep4-handler-to-pico then
+    buffer-status USB_BUFFER_STATUS_EP4_TO_HOST and if 0 0 EP4-task @ notify-set  then
+    buffer-status USB_BUFFER_STATUS_EP4_TO_PICO and if 1 0 EP4-task @ notify-set  then
 
   ;
 
@@ -1390,6 +1411,7 @@ variable lba-count
 	s" USBS" CSW dCSWSignature swap move
 	0 PREVENT-REMOVAL !
     0 ['] flush-task 128 128 512 spawn run 
+	EP4-task-init
 
     ['] usb-irq-handler usbctrl-vector vector!
 
