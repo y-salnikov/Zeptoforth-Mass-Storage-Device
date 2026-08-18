@@ -1270,17 +1270,22 @@ variable lba-count
 	
 	variable EP4-mailbox
 	variable EP4-task
+    variable EP4-to-Pico-event
+	variable EP4-to-Host-event
 
 	: EP4-handler
 		begin
-			0 wait-notify case
-				0 of				\ EP4-to-Host interrupt
-					ep4-handler-to-host
-				endof				\ EP4-to-Pico interrupt
-				1 of
-					ep4-handler-to-pico
-				endof
-			endcase
+			0 wait-notify drop
+			begin
+				EP4-to-Host-event @ if  	\ EP4-to-Host interrupt
+						0 EP4-to-Host-event !
+						ep4-handler-to-host
+				then
+				EP4-to-Pico-event @ if 	\ EP4-to-Pico interrupt
+						0 EP4-to-Pico-event !
+						ep4-handler-to-pico
+				then
+			EP4-to-Host-event @ 0= EP4-to-Pico-event @ 0= and until
 		again
 	;
 	
@@ -1310,8 +1315,8 @@ variable lba-count
     buffer-status USB_BUFFER_STATUS_EP1_TO_HOST and if ep1-handler-to-host then
     buffer-status USB_BUFFER_STATUS_EP1_TO_PICO and if ep1-handler-to-pico then
     buffer-status USB_BUFFER_STATUS_EP3_TO_HOST and if ep3-handler-to-host then
-    buffer-status USB_BUFFER_STATUS_EP4_TO_HOST and if 0 0 EP4-task @ notify-set  then
-    buffer-status USB_BUFFER_STATUS_EP4_TO_PICO and if 1 0 EP4-task @ notify-set  then
+    buffer-status USB_BUFFER_STATUS_EP4_TO_HOST and if 1 EP4-to-Host-event ! 0 EP4-task @ notify then
+    buffer-status USB_BUFFER_STATUS_EP4_TO_PICO and if 1 EP4-to-Pico-event ! 0 EP4-task @ notify then
 
   ;
 
