@@ -1291,6 +1291,8 @@ variable lba-count
 	
 	: EP4-task-init
 		0 EP4-mailbox !
+		0 EP4-to-Pico-event !
+		0 EP4-to-Host-event !
 		0 ['] EP4-handler 1024 256 512 spawn EP4-task !
 		EP4-mailbox 1 EP4-task @ config-notify
 		EP4-task @ run
