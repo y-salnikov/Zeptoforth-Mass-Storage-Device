@@ -1069,22 +1069,19 @@ begin-module usb-core
           0 { r-val }
           blks 0= if 1 to r-val else 0 to r-val then
           RESPONSE-CMD @ case
-            $00 of
+            SCSI-CMD-TEST-UNIT-READY of
                 r-val CSW CSW-bCSWStatus c!
             endof
-            $1B of
-                0 CSW CSW-bCSWStatus c!
-            endof
-            $25 of
+            SCSI-CMD-READ-CAPACITY-10 of
                 r-val CSW CSW-bCSWStatus c!
             endof
-            $28 of
+            SCSI-CMD-READ-10 of
                 r-val CSW CSW-bCSWStatus c!
             endof
-            $2a of
+            SCSI-CMD-WRITE-10 of
                 r-val CSW CSW-bCSWStatus c!
             endof
-            $23 of
+            SCSI-CMD-READ-FORMAT-CAPACITY of
                 r-val CSW CSW-bCSWStatus c!
             endof
 
@@ -1133,30 +1130,30 @@ begin-module usb-core
    
 
     adr c@ case
-      $12 of                  \ INQUIRY
+      SCSI-CMD-INQUIRY of                  \ INQUIRY
           SCSI-inquiry-response-data EP4-to-Host dpram-address @ 36 move
-          $12 RESPONSE-CMD !
+          SCSI-CMD-INQUIRY RESPONSE-CMD !
           EP4-to-Host 36 usb-send-data-packet
       endof
 
-      $00 of                  \ Test unit ready
-          0 RESPONSE-CMD !
+      SCSI-CMD-TEST-UNIT-READY of                  \ Test unit ready
+          SCSI-CMD-TEST-UNIT-READY RESPONSE-CMD !
           SCSI-response
       endof
 
-      $25 of                  \ Read Capacity
+      SCSI-CMD-READ-CAPACITY-10 of                  \ Read Capacity
         blks block-count 1 - reverse-byte-order SCSI-capacity-data !
         blks block-size  reverse-byte-order SCSI-capacity-data 4 + !
         SCSI-capacity-data EP4-to-Host dpram-address @ 8 move
-        $25 RESPONSE-CMD !
+        SCSI-CMD-READ-CAPACITY-10 RESPONSE-CMD !
         EP4-to-Host 8 usb-send-data-packet
       endof
       
-      $28 of                  \ Read(10)
+      SCSI-CMD-READ-10 of                  \ Read(10)
         CBW-COPY CBW-dCBWCB  2 + u@ reverse-byte-order                  \ Unaligned memory read !!! 
         CBW-COPY CBW-dCBWCB  7 + dup c@ swap 1+ c@ swap 8 lshift or 
         ( lba num -- )
-        $28 RESPONSE-CMD !
+        SCSI-CMD-READ-10 RESPONSE-CMD !
         1 CBW-PHASE !
         LBA-COUNT !
         LBA-CURRENT !
@@ -1164,28 +1161,28 @@ begin-module usb-core
         read-next-lba
       endof
 
-      $1A of                  \ mode sense
+      SCSI-CMD-MODE-SENSE of                  \ mode sense
         SCSI-mode-sense-response-data EP4-to-Host dpram-address @ 4 move
-        $1A RESPONSE-CMD !
+        SCSI-CMD-MODE-SENSE RESPONSE-CMD !
         EP4-to-Host 4 usb-send-data-packet
       endof
-                        $1B of
-                          \ handle STOP START UNIT
-                          $1B RESPONSE-CMD !
-                          SCSI-response
-                        endof
-      $1E of                  \ prevent/allow media removal
-        CBW-COPY CBW-dCBWCB 4 + c@ PREVENT-REMOVAL !
-        $1E RESPONSE-CMD !
+
+      SCSI-CMD-START-STOP-UNIT of                  \ handle STOP START UNIT
+        SCSI-CMD-START-STOP-UNIT RESPONSE-CMD !
         SCSI-response
       endof
-      $2A of                  \ write(10)
 
+      SCSI-CMD-PREVENT-ALLOW-REMOVAL of                  \ prevent/allow media removal
+        CBW-COPY CBW-dCBWCB 4 + c@ PREVENT-REMOVAL !
+        SCSI-CMD-PREVENT-ALLOW-REMOVAL RESPONSE-CMD !
+        SCSI-response
+      endof
 
+      SCSI-CMD-WRITE-10 of                  \ write(10)
         CBW-COPY CBW-dCBWCB  2 + u@ reverse-byte-order 
         CBW-COPY CBW-dCBWCB  7 + dup c@ swap 1+ c@ swap 8 lshift or 
         ( lba num -- )
-        $2A RESPONSE-CMD !
+        SCSI-CMD-WRITE-10 RESPONSE-CMD !
         2 CBW-PHASE !
         LBA-COUNT !
         LBA-CURRENT !
@@ -1193,21 +1190,22 @@ begin-module usb-core
         true write-next-lba
       endof
 
-      $23 of                \ read format capacity
+      SCSI-CMD-READ-FORMAT-CAPACITY of                \ read format capacity
         SCSI-prepare-format-capacity-data
         SCSI-format-capacity-data EP4-to-Host dpram-address @ 12 move
-        $23 RESPONSE-CMD !
+        SCSI-CMD-READ-FORMAT-CAPACITY RESPONSE-CMD !
         EP4-to-Host 12 usb-send-data-packet
       endof
 
-      $03 of                \ request sense
+      SCSI-CMD-REQUEST-SENSE of                \ request sense
         SCSI-request-sense-data EP4-to-Host dpram-address @ 18 move
-        $03 RESPONSE-CMD !
+        SCSI-CMD-REQUEST-SENSE RESPONSE-CMD !
         EP4-to-Host 18 usb-send-data-packet
       endof
-      $35 of                \ SYNCHRONIZE CACHE
+
+      SCSI-CMD-SYNCHRONIZE-CACHE-10 of                \ SYNCHRONIZE CACHE
         blks flush-blocks
-        $35 RESPONSE-CMD !
+        SCSI-CMD-SYNCHRONIZE-CACHE-10 RESPONSE-CMD !
         SCSI-response 
       endof
 
