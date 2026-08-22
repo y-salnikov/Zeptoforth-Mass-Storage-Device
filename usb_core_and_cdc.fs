@@ -96,6 +96,9 @@ begin-module usb-core
   variable EP4-to-Pico-event
   variable EP4-to-Host-event
 
+  variable LBA-CURRENT
+  variable LBA-COUNT
+
   \ USB Standard Device Descriptor - 18 bytes
   create device-data
     USB_DT_DEVICE :desc
@@ -320,28 +323,26 @@ begin-module usb-core
   end-structure  
 
  \ Mass Storage CBW structure
-  begin-structure CWB-structure
-  field:  dCBWSignature
-  field:  dCBWTag
-  field:  dCBWDataTransferLength
-  cfield: bmCBWFlags
-  cfield: bCBWLUN
-  cfield: bCBWCBLength
-  16 +field dCBWCB
+  begin-structure CBW-size
+    field:  CBW-dCBWSignature
+    field:  CBW-dCBWTag
+    field:  CBW-dCBWDataTransferLength
+    cfield: CBW-bmCBWFlags
+    cfield: CBW-bCBWLUN
+    cfield: CBW-bCBWCBLength
+    16 +field CBW-dCBWCB
   end-structure
 
-  begin-structure CSW-structure
-  field:  dCSWSignature
-  field:  dCSWTag
-  field:  dCSWDataResidue
-  cfield: bCSWStatus
+  begin-structure CSW-size
+    field:  CSW-dCSWSignature
+    field:  CSW-wCSWTag
+    field:  CSW-dCSWDataResidue
+    cfield: CSW-bCSWStatus
   end-structure
 
-CWB-structure buffer: CBW-COPY
-CSW-structure buffer: CSW
-512 buffer: lba-buf
-variable lba-current
-variable lba-count
+  CBW-size buffer: CBW-COPY
+  CSW-size buffer: CSW
+  512 buffer: lba-buf
 
   \ Setup, CDC Class and Endpoint buffers
   usb-setup-command buffer: usb-setup
@@ -802,13 +803,13 @@ variable lba-count
   : usb-setup-type-class-respond-to-host ( -- )
     usb-setup setup-request c@ case
       CDC_CLASS_GET_LINE_CODING of usb-class-get-line-coding endof
-    $fe of
-    0 EP4-to-Pico-event !
-    0 EP4-to-Host-event !
-    -1 RESPONSE-CMD !
-    0 CBW-PHASE !
-    1 LUNS  usb-start-control-transfer-to-host
-    endof
+      $fe of
+        0 EP4-to-Pico-event !         \ reinitialize state variables
+        0 EP4-to-Host-event !         \ in case of disconnect
+        -1 RESPONSE-CMD !
+        0 CBW-PHASE !
+        1 LUNS  usb-start-control-transfer-to-host
+      endof
     endcase
   ;
 
@@ -1016,24 +1017,20 @@ variable lba-count
     \ N.B. no corresponding EP3-to-Pico endpoint required
   ;
 
-\  LED pin 25 used in pico-w
-\  led import
-  : flush-task
+  : flush-task  
   0 { st }
   begin
-    st if
-      PREVENT-REMOVAL @ 0= if
+    st if                           \ if PREVENT-REMOVAL not active longer than 2 seconds
+      PREVENT-REMOVAL @ 0= if       \ assuming filesystem unmounted on host PC
         2000 ms
         PREVENT-REMOVAL @ 0= if
           blks flush-blocks
-          0 to st
-\         0 green led!
+          false to st
         then
       then
     else
       PREVENT-REMOVAL @ if
-        1 to st
-\       1 green led!
+        true to st
       then
     then
     1000 ms
@@ -1041,12 +1038,12 @@ variable lba-count
   ;
   
   : u@  ( adr -- x ) \ unaligned read for RP2040
-  dup c@ swap dup 1+ c@ 8 lshift swap dup 2 + c@ 16 lshift swap 3 + c@ 24 lshift 
+    dup c@ swap dup 1+ c@ 8 lshift swap dup 2 + c@ 16 lshift swap 3 + c@ 24 lshift 
   or or or
   ;
 
   : uh! ( x adr -- ) \ unaligned 16-bit write
-  over $ff and over c! swap $ff00 and 8 rshift swap 1+  c! 
+    over $ff and over c! swap $ff00 and 8 rshift swap 1+  c! 
   ;
 
   : reverse-byte-order ( u_in -- u_out )
@@ -1054,40 +1051,40 @@ variable lba-count
   ;
 
   : SCSI-prepare-format-capacity-data
-  SCSI-format-capacity-data 12 0 fill
-  8 SCSI-format-capacity-data 3 + c!                  \ list_length
-  blks block-count reverse-byte-order SCSI-format-capacity-data 4 + ! \ block_num    should be aligned
-  2 SCSI-format-capacity-data 8 + c!                  \ 2 - formated media
-  blks block-size dup $ff and 8 lshift swap $ff00 and 8 rshift or SCSI-format-capacity-data 10 + uh!
+      SCSI-format-capacity-data 12 0 fill
+      8 SCSI-format-capacity-data 3 + c!                  \ list_length
+      blks block-count reverse-byte-order SCSI-format-capacity-data 4 + ! \ block_num    should be aligned
+      2 SCSI-format-capacity-data 8 + c!                  \ 2 - formated media
+      blks block-size dup $ff and 8 lshift swap $ff00 and 8 rshift or SCSI-format-capacity-data 10 + uh!
   ;
 
   : SCSI-response ( -- )
         RESPONSE-CMD @ 0 >= if
-          CBW-COPY dCBWTag CSW dCBWTag 4 move
-          0 CSW dCSWDataResidue !
+          CBW-COPY CBW-dCBWTag CSW CBW-dCBWTag 4 move
+          0 CSW CSW-dCSWDataResidue !
           0 { r-val }
           blks 0= if 1 to r-val else 0 to r-val then
           RESPONSE-CMD @ case
             $00 of
-                r-val CSW bCSWStatus c!
-                                                endof
-                                                $1B of
-                                                  r-val CSW bCSWStatus c!
-                                                endof
+                r-val CSW CSW-bCSWStatus c!
+            endof
+            $1B of
+                0 CSW CSW-bCSWStatus c!
+            endof
             $25 of
-                r-val CSW bCSWStatus c!
+                r-val CSW CSW-bCSWStatus c!
             endof
             $28 of
-                r-val CSW bCSWStatus c!
+                r-val CSW CSW-bCSWStatus c!
             endof
             $2a of
-                r-val CSW bCSWStatus c!
+                r-val CSW CSW-bCSWStatus c!
             endof
             $23 of
-                r-val CSW bCSWStatus c!
+                r-val CSW CSW-bCSWStatus c!
             endof
 
-            0 CSW bCSWStatus c!
+            0 CSW CSW-bCSWStatus c!
           endcase
           CSW EP4-to-Host dpram-address @ 13 move
           -1 RESPONSE-CMD !
@@ -1096,19 +1093,19 @@ variable lba-count
   ;
 
   : read-next-lba
-  lba-count @ 0> if 
-    lba-buf   blks block-size    lba-current @   blks block@   \ read block to lba-buf
-    1 lba-current +!
-    -1 lba-count +!
-    0 EP4-to-Host processed-bytes !
-    blks block-size EP4-to-Host total-bytes !
-    lba-buf EP4-to-Host source-address !
-    lba-buf     EP4-to-Host dpram-address @   EP4-to-Host max-packet-size @     move 
-    EP4-to-Host EP4-to-Host max-packet-size @ usb-send-data-packet
-  else
-    0 CBW-PHASE !
-    SCSI-response
-  then
+    LBA-COUNT @ 0> if 
+      lba-buf   blks block-size    LBA-CURRENT @   blks block@   \ read block to lba-buf
+      1 LBA-CURRENT +!
+      -1 LBA-COUNT +!
+      0 EP4-to-Host processed-bytes !
+      blks block-size EP4-to-Host total-bytes !
+      lba-buf EP4-to-Host source-address !
+      lba-buf     EP4-to-Host dpram-address @   EP4-to-Host max-packet-size @     move 
+      EP4-to-Host EP4-to-Host max-packet-size @ usb-send-data-packet
+    else
+      0 CBW-PHASE !
+      SCSI-response
+    then
   ;
 
   : write-next-lba { init? -- }
@@ -1117,13 +1114,12 @@ variable lba-count
     lba-buf   EP4-to-Pico  source-address !
   
     init? 0= if
-\     ." Fake Writing block " lba-current @ . cr
-      lba-buf   blks block-size   lba-current @  blks block!
-      1 lba-current +!
-      -1 lba-count +!
+      lba-buf   blks block-size   LBA-CURRENT @  blks block!
+      1 LBA-CURRENT +!
+      -1 LBA-COUNT +!
     then
     
-    lba-count @ 0 = if
+    LBA-COUNT @ 0 = if
       0 CBW-PHASE !
       SCSI-response
     then
@@ -1134,13 +1130,9 @@ variable lba-count
 
     adr c@ case
       $12 of                  \ INQUIRY
-\       CBW-COPY dCBWDataTransferLength @ 36 = if
           SCSI-inquiry-response-data EP4-to-Host dpram-address @ 36 move
           $12 RESPONSE-CMD !
           EP4-to-Host 36 usb-send-data-packet
-\       else
-\         ." dCBWDataTransferLength != 36" cr
-\       then
       endof
 
       $00 of                  \ Test unit ready
@@ -1157,13 +1149,13 @@ variable lba-count
       endof
       
       $28 of                  \ Read(10)
-        CBW-COPY dCBWCB  2 + u@ reverse-byte-order                  \ Unaligned memory read !!! 
-        CBW-COPY dCBWCB  7 + dup c@ swap 1+ c@ swap 8 lshift or 
+        CBW-COPY CBW-dCBWCB  2 + u@ reverse-byte-order                  \ Unaligned memory read !!! 
+        CBW-COPY CBW-dCBWCB  7 + dup c@ swap 1+ c@ swap 8 lshift or 
         ( lba num -- )
         $28 RESPONSE-CMD !
         1 CBW-PHASE !
-        lba-count !
-        lba-current !
+        LBA-COUNT !
+        LBA-CURRENT !
         ['] read-next-lba EP4-to-Host callback-handler !
         read-next-lba
       endof
@@ -1179,20 +1171,20 @@ variable lba-count
                           SCSI-response
                         endof
       $1E of                  \ prevent/allow media removal
-        CBW-COPY dCBWCB 4 + c@ PREVENT-REMOVAL !
+        CBW-COPY CBW-dCBWCB 4 + c@ PREVENT-REMOVAL !
         $1E RESPONSE-CMD !
         SCSI-response
       endof
       $2A of                  \ write(10)
 
 
-        CBW-COPY dCBWCB  2 + u@ reverse-byte-order 
-        CBW-COPY dCBWCB  7 + dup c@ swap 1+ c@ swap 8 lshift or 
+        CBW-COPY CBW-dCBWCB  2 + u@ reverse-byte-order 
+        CBW-COPY CBW-dCBWCB  7 + dup c@ swap 1+ c@ swap 8 lshift or 
         ( lba num -- )
         $2A RESPONSE-CMD !
         2 CBW-PHASE !
-        lba-count !
-        lba-current !
+        LBA-COUNT !
+        LBA-CURRENT !
         ['] write-next-lba EP4-to-Pico callback-handler !
         true write-next-lba
       endof
@@ -1218,7 +1210,7 @@ variable lba-count
 
       s" SCSI Cmd: " type
       16 base !
-      len 0 do adr i + c@ . loop ." not implemented" cr   \ debug
+      len 0 do adr i + c@ . loop ." not implemented" cr   \ debug missing commands
       decimal
     endcase
     
@@ -1226,12 +1218,9 @@ variable lba-count
 
   : CBW-parse { CBW -- }
     CBW CBW-COPY 31 move
-    CBW dCBWSignature 4  s" USBC" equal-strings? if
-      CBW dCBWCB CBW bCBWCBLength c@  SCSI-command 
-    else
-       s" wrong CBW signature" type cr
+    CBW CBW-dCBWSignature 4  s" USBC" equal-strings? if
+      CBW CBW-dCBWCB CBW CBW-bCBWCBLength c@  SCSI-command 
     then
-
   ;
 
   : ep4-handler-to-host ( -- )
@@ -1250,8 +1239,8 @@ variable lba-count
         else
           EP4-to-Host callback-handler @ execute
         then
-        endof
-      endcase
+      endof
+    endcase
   ;
   
   : ep4-handler-to-pico ( -- )
@@ -1260,15 +1249,12 @@ variable lba-count
       CBW-PHASE @ case
         0 of EP4-to-Pico dpram-address @ CBW-parse endof
         2 of
-          EP4-to-Pico dpram-address @ EP4-to-Pico source-address @ EP4-to-Pico transfer-bytes @ move  \ . h.8 bl emit h.8 cr 
+          EP4-to-Pico dpram-address @ EP4-to-Pico source-address @ EP4-to-Pico transfer-bytes @ move
           EP4-to-Pico usb-update-endpoint-byte-counts
           EP4-to-Pico transfer-bytes @ EP4-to-Pico   source-address +!
           EP4-to-Pico usb-get-next-packet-size-to-host 0= if
             false EP4-to-Pico callback-handler @ execute
-          else
-            
           then
-
         endof
       endcase
       EP4-to-Pico 64 usb-receive-data-packet
@@ -1414,13 +1400,13 @@ variable lba-count
     false usb-device-configured? !
     false line-notification-complete? !
     false usb-readied? !
-  0 LUNS !
-  0 CBW-PHASE !
-  0 RESPONSE-CMD !
-  s" USBS" CSW dCSWSignature swap move
-  0 PREVENT-REMOVAL !
+    0 LUNS !
+    0 CBW-PHASE !
+    0 RESPONSE-CMD !
+    s" USBS" CSW CSW-dCSWSignature swap move
+    0 PREVENT-REMOVAL !
     0 ['] flush-task 128 128 512 spawn run 
-  EP4-task-init
+    EP4-task-init
 
     ['] usb-irq-handler usbctrl-vector vector!
 
