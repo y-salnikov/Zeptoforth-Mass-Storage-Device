@@ -1282,6 +1282,7 @@ begin-module usb-core
     0 EP4-to-Pico-event !
     0 EP4-to-Host-event !
     0 ['] EP4-handler 1024 256 512 spawn EP4-task !
+    c" EP4-handler" EP4-task @ task-name!
     EP4-mailbox 1 EP4-task @ config-notify
     EP4-task @ run
   ;
@@ -1405,7 +1406,8 @@ begin-module usb-core
     0 RESPONSE-CMD !
     s" USBS" CSW CSW-dCSWSignature swap move
     0 PREVENT-REMOVAL !
-    0 ['] flush-task 128 128 512 spawn run 
+    c" Flush-task"
+    0 ['] flush-task 128 128 512 spawn dup run task-name!
     EP4-task-init
 
     ['] usb-irq-handler usbctrl-vector vector!
