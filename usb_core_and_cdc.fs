@@ -1038,12 +1038,16 @@ begin-module usb-core
   ;
   
   : u@  ( adr -- x ) \ unaligned read for RP2040
+    [ rp2350? ] [if] [inlined] @ [else]
     dup c@ swap dup 1+ c@ 8 lshift swap dup 2 + c@ 16 lshift swap 3 + c@ 24 lshift 
-  or or or
+    or or or
+    [then]
   ;
 
   : uh! ( x adr -- ) \ unaligned 16-bit write
-    over $ff and over c! swap $ff00 and 8 rshift swap 1+  c! 
+    [ rp2350? ] [if] [inlined] h! [else]
+    over $ff and over c! swap $ff00 and 8 rshift swap 1+  c!
+	[then]
   ;
 
   : reverse-byte-order ( u_in -- u_out )
